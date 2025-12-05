@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mini Age of Empires – AgeofEmpires2_def</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Mini Age of Empires – Erweiterte Vollversion</h1>
+  <div id="status-bar">
+    Zeit: <span id="ui-time">0</span>s ·
+    Ziv: Franken ·
+    Zeitalter: <span id="ui-age">Dunkles Zeitalter</span> ·
+    Bevölkerung: <span id="ui-pop">0 / 0</span> ·
+    🍞 <span id="ui-food">200</span> ·
+    🪵 <span id="ui-wood">200</span> ·
+    🪙 <span id="ui-gold">100</span> ·
+    🪨 <span id="ui-stone">0</span>
+  </div>
+
+  <div id="game">
+    <!-- ECO -->
+    <div class="panel">
+      <h2>Wirtschaft &amp; Dorfbewohner</h2>
+
+      <div class="section-title">Ressourcen pro Tick</div>
+      <div class="row"><span class="label">Nahrung</span><span class="value" id="rate-food">0.0</span></div>
+      <div class="row"><span class="label">Holz</span><span class="value" id="rate-wood">0.0</span></div>
+      <div class="row"><span class="label">Gold</span><span class="value" id="rate-gold">0.0</span></div>
+      <div class="row"><span class="label">Stein</span><span class="value" id="rate-stone">0.0</span></div>
+
+      <div class="section-title">Dorfbewohner</div>
+      <div class="row"><span class="label">Anzahl</span><span class="value" id="vils-count">3</span></div>
+      <div class="row"><span class="label">an Nahrung</span><span class="value" id="vils-food">3</span></div>
+      <div class="row"><span class="label">an Holz</span><span class="value" id="vils-wood">0</span></div>
+      <div class="row"><span class="label">an Gold</span><span class="value" id="vils-gold">0</span></div>
+      <div class="row"><span class="label">an Stein</span><span class="value" id="vils-stone">0</span></div>
+      <div class="row"><span class="label">untätig</span><span class="value" id="vils-idle">0</span></div>
+
+      <div class="section-title">Aufgaben zuteilen</div>
+      <button data-action="task-food">Villager → Nahrung</button>
+      <button data-action="task-wood">Villager → Holz</button>
+      <button data-action="task-gold">Villager → Gold</button>
+      <button data-action="task-stone">Villager → Stein</button>
+      <button data-action="task-idle">Villager → untätig</button>
+
+      <div class="section-title">Produktion</div>
+      <button data-action="make-vil">Dorfbewohner (50🍞)</button>
+      <button data-action="build-house">Haus (25🪵)</button>
+
+      <div class="section-title">Gebäude</div>
+      <div class="row"><span class="label">Häuser</span><span class="value" id="ui-houses">0</span></div>
+      <div class="row"><span class="label">Kasernen</span><span class="value" id="ui-barracks">0</span></div>
+      <div class="row"><span class="label">Schießanlagen</span><span class="value" id="ui-range">0</span></div>
+      <div class="row"><span class="label">Ställe</span><span class="value" id="ui-stable">0</span></div>
+
+      <div class="section-title">Eco-Upgrades</div>
+      <button data-action="eco-wood">Doppelaxt (Holz +20%)</button>
+      <button data-action="eco-food">Pflug (Nahrung +20%)</button>
+      <button data-action="eco-wheel">Schubkarre (+15% alles)</button>
+    </div>
+
+    <!-- MINIMAP + LOG -->
+    <div class="panel">
+      <div class="top-controls">
+        <span style="font-weight:600;">Minimap &amp; Einheiten</span>
+        <span style="margin-left:auto;"></span>
+        <label for="map-type">Kartentyp:</label>
+        <select id="map-type">
+          <option value="arabia">Arabia</option>
+          <option value="black_forest">Black Forest</option>
+          <option value="arena">Arena</option>
+          <option value="islands">Islands</option>
+        </select>
+        <button class="inline-btn" id="btn-new-map">Neue Karte</button>
+      </div>
+
+      <div class="row">
+        <span class="label">Eigene Basis</span>
+        <span class="value" id="hp-base-label">100 / 100</span>
+      </div>
+      <div class="hp-bar-container"><div id="hp-base" class="hp"></div></div>
+
+      <div class="row" style="margin-top:4px;">
+        <span class="label">Feindliche Basis</span>
+        <span class="value" id="hp-enemy-label">200 / 200</span></div>
+      <div class="hp-bar-container"><div id="hp-enemy" class="hp enemy"></div></div>
+
+      <div id="minimap-wrapper">
+        <div id="minimap"></div>
+      </div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:4px;">
+        Klick: Einheit wählen oder Ziel setzen. Hell = im Sichtbereich, dunkel = erkundet.
+        Ziehen mit der Maus: Karte verschieben.
+      </div>
+
+      <div class="section-title">Log</div>
+      <div id="log"></div>
+    </div>
+
+    <!-- MILITÄR -->
+    <div class="panel">
+      <h2>Militär, Tech &amp; Angriffe</h2>
+
+      <div class="section-title">Armee</div>
+      <div class="row"><span class="label">Infanterie</span><span class="value" id="mil-inf">0</span></div>
+      <div class="row"><span class="label">Speerträger</span><span class="value" id="mil-spear">0</span></div>
+      <div class="row"><span class="label">Bogenschützen</span><span class="value" id="mil-archer">0</span></div>
+      <div class="row"><span class="label">Kavallerie</span><span class="value" id="mil-cav">0</span></div>
+
+      <div class="section-title">Militär-Gebäude</div>
+      <button data-action="build-barracks">Kaserne (175🪵)</button>
+      <button data-action="build-range">Schießanlage (200🪵, 50🪙)</button>
+      <button data-action="build-stable">Stall (175🪵, 75🪙)</button>
+
+      <div class="section-title">Einheiten produzieren</div>
+      <button data-action="train-inf">Infanterie (60🍞, 20🪙)</button>
+      <button data-action="train-spear">Speerträger (50🍞, 35🪵)</button>
+      <button data-action="train-archer">Bogenschütze (50🪵, 45🪙)</button>
+      <button data-action="train-cav">Kundschafter (80🍞, 40🪙)</button>
+
+      <div class="section-title">Angriffe</div>
+      <button data-action="raid">Kleiner Überfall</button>
+      <button data-action="push">Grosser Angriff</button>
+
+      <div class="section-title">Spielgeschwindigkeit</div>
+      <button data-action="speed1">x1</button>
+      <button data-action="speed2">x2</button>
+      <button data-action="speed4">x4</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
