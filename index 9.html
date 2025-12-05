@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mini Age of Empires – Spielbare Vollversion</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{
+      background:#020617;
+      color:#e5e7eb;
+      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      padding:16px;
+    }
+    h1{font-size:24px;margin-bottom:6px;}
+    #status-bar{font-size:13px;margin-bottom:10px;}
+    #game{
+      display:grid;
+      grid-template-columns:2fr 3fr 2fr;
+      gap:10px;
+    }
+    @media (max-width:1100px){
+      #game{grid-template-columns:1fr;}
+    }
+    .panel{
+      background:#020617;
+      padding:10px;
+      border-radius:10px;
+      border:1px solid #1f2937;
+      box-shadow:0 10px 25px rgba(0,0,0,0.45);
+    }
+    .panel h2{
+      font-size:18px;
+      margin-bottom:6px;
+      border-bottom:1px solid #1f2937;
+      padding-bottom:4px;
+    }
+    .section-title{
+      margin-top:8px;
+      font-weight:600;
+      font-size:14px;
+    }
+    .row{
+      display:flex;
+      justify-content:space-between;
+      margin:2px 0;
+      font-size:13px;
+    }
+    .label{color:#9ca3af;}
+    .value{font-weight:600;}
+    button{
+      background:#1d4ed8;
+      color:#f9fafb;
+      padding:6px 8px;
+      border-radius:7px;
+      border:none;
+      font-size:13px;
+      margin:3px 0;
+      width:100%;
+      cursor:pointer;
+      transition:background 0.15s ease, transform 0.05s ease, box-shadow 0.1s ease;
+    }
+    button:hover{background:#2563eb;box-shadow:0 3px 8px rgba(37,99,235,0.5);}
+    button:active{transform:scale(0.98);box-shadow:none;}
+    button:disabled{background:#4b5563;cursor:not-allowed;box-shadow:none;}
+    #minimap-wrapper{
+      width:780px;
+      height:780px;
+      overflow:hidden;
+      border:2px solid #334155;
+      position:relative;
+      cursor:grab;
+      background:#020617;
+      margin:6px auto;
+    }
+    #minimap-wrapper:active{cursor:grabbing;}
+    /* 128x128 Tiles à 6px = 768px */
+    #minimap{
+      position:absolute;
+      top:0;
+      left:0;
+      display:grid;
+      grid-template-columns:repeat(128,6px);
+      grid-template-rows:repeat(128,6px);
+      width:768px;
+      height:768px;
+    }
+    .tile{width:6px;height:6px;}
+    .g{background:#15803d;}   /* Grass */
+    .f{background:#065f46;}   /* Forest */
+    .w{background:#0284c7;}   /* Water */
+    .s{background:#6b7280;}   /* Stone / Wall */
+    .o{background:#eab308;}   /* Gold */
+    .pb{background:#06b6d4;}  /* Player base */
+    .eb{background:#e11d48;}  /* Enemy base */
+    .fog-v{filter:none;}
+    .fog-d{filter:brightness(0.45) contrast(0.9);}
+    .u-tile{box-shadow:0 0 5px 3px #f97316;}
+    .u-sel{box-shadow:0 0 6px 4px #facc15;}
+    #log{
+      background:#000;
+      border-radius:6px;
+      border:1px solid #1f2937;
+      height:200px;
+      overflow-y:auto;
+      padding:4px;
+      font-size:12px;
+      margin-top:4px;
+    }
+    #log div{margin-bottom:2px;}
+    .log-system{color:#9ca3af;}
+    .log-good{color:#22c55e;}
+    .log-bad{color:#f97316;}
+    .log-danger{color:#f87171;}
+    #log::-webkit-scrollbar{width:6px;}
+    #log::-webkit-scrollbar-thumb{background:#4b5563;border-radius:999px;}
+    select,.inline-btn{
+      font-size:12px;
+      padding:3px 6px;
+      border-radius:4px;
+      border:1px solid #4b5563;
+      background:#020617;
+      color:#e5e7eb;
+    }
+    .inline-btn{
+      background:#1d4ed8;
+      border-color:#1d4ed8;
+      cursor:pointer;
+    }
+    .inline-btn:hover{background:#2563eb;}
+    .top-controls{
+      display:flex;
+      gap:4px;
+      align-items:center;
+      margin-bottom:4px;
+      font-size:12px;
+    }
+    .hp-bar-container{
+      margin-top:4px;
+      background:#111827;
+      border-radius:999px;
+      overflow:hidden;
+      height:10px;
+    }
+    .hp{
+      height:100%;
+      background:#22c55e;
+      width:100%;
+    }
+    .hp.enemy{background:#ef4444;}
+  </style>
+</head>
+<body>
+  <h1>Mini Age of Empires – Spielbare Vollversion</h1>
+  <div id="status-bar">
+    Zeit: <span id="ui-time">0</span>s ·
+    Ziv: Franken ·
+    Zeitalter: <span id="ui-age">Dunkles Zeitalter</span> ·
+    Bevölkerung: <span id="ui-pop">0 / 0</span> ·
+    🍞 <span id="ui-food">200</span> ·
+    🪵 <span id="ui-wood">200</span> ·
+    🪙 <span id="ui-gold">100</span> ·
+    🪨 <span id="ui-stone">0</span>
+  </div>
+
+  <div id="game">
+    <!-- ECO -->
+    <div class="panel">
+      <h2>Wirtschaft &amp; Dorfbewohner</h2>
+
+      <div class="section-title">Ressourcen pro Tick</div>
+      <div class="row"><span class="label">Nahrung</span><span class="value" id="rate-food">0.0</span></div>
+      <div class="row"><span class="label">Holz</span><span class="value" id="rate-wood">0.0</span></div>
+      <div class="row"><span class="label">Gold</span><span class="value" id="rate-gold">0.0</span></div>
+      <div class="row"><span class="label">Stein</span><span class="value" id="rate-stone">0.0</span></div>
+
+      <div class="section-title">Dorfbewohner</div>
+      <div class="row"><span class="label">Anzahl</span><span class="value" id="vils-count">3</span></div>
+      <div class="row"><span class="label">an Nahrung</span><span class="value" id="vils-food">3</span></div>
+      <div class="row"><span class="label">an Holz</span><span class="value" id="vils-wood">0</span></div>
+      <div class="row"><span class="label">an Gold</span><span class="value" id="vils-gold">0</span></div>
+      <div class="row"><span class="label">an Stein</span><span class="value" id="vils-stone">0</span></div>
+      <div class="row"><span class="label">untätig</span><span class="value" id="vils-idle">0</span></div>
+
+      <div class="section-title">Aufgaben zuteilen</div>
+      <button data-action="task-food">Villager → Nahrung</button>
+      <button data-action="task-wood">Villager → Holz</button>
+      <button data-action="task-gold">Villager → Gold</button>
+      <button data-action="task-stone">Villager → Stein</button>
+      <button data-action="task-idle">Villager → untätig</button>
+
+      <div class="section-title">Produktion</div>
+      <button data-action="make-vil">Dorfbewohner (50🍞)</button>
+      <button data-action="build-house">Haus (25🪵)</button>
+
+      <div class="section-title">Gebäude</div>
+      <div class="row"><span class="label">Häuser</span><span class="value" id="ui-houses">0</span></div>
+      <div class="row"><span class="label">Kasernen</span><span class="value" id="ui-barracks">0</span></div>
+      <div class="row"><span class="label">Schießanlagen</span><span class="value" id="ui-range">0</span></div>
+      <div class="row"><span class="label">Ställe</span><span class="value" id="ui-stable">0</span></div>
+
+      <div class="section-title">Eco-Upgrades</div>
+      <button data-action="eco-wood">Doppelaxt (Holz +20%)</button>
+      <button data-action="eco-food">Pflug (Nahrung +20%)</button>
+      <button data-action="eco-wheel">Schubkarre (+15% alles)</button>
+    </div>
+
+    <!-- MINIMAP + LOG -->
+    <div class="panel">
+      <div class="top-controls">
+        <span style="font-weight:600;">Minimap &amp; Einheiten</span>
+        <span style="margin-left:auto;"></span>
+        <label for="map-type">Kartentyp:</label>
+        <select id="map-type">
+          <option value="arabia">Arabia</option>
+          <option value="black_forest">Black Forest</option>
+          <option value="arena">Arena</option>
+          <option value="islands">Islands</option>
+        </select>
+        <button class="inline-btn" id="btn-new-map">Neue Karte</button>
+      </div>
+
+      <div class="row">
+        <span class="label">Eigene Basis</span>
+        <span class="value" id="hp-base-label">100 / 100</span>
+      </div>
+      <div class="hp-bar-container"><div id="hp-base" class="hp"></div></div>
+
+      <div class="row" style="margin-top:4px;">
+        <span class="label">Feindliche Basis</span>
+        <span class="value" id="hp-enemy-label">200 / 200</span>
+      </div>
+      <div class="hp-bar-container"><div id="hp-enemy" class="hp enemy"></div></div>
+
+      <div id="minimap-wrapper">
+        <div id="minimap"></div>
+      </div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:4px;">
+        Klick auf Kacheln: Einheit wählen oder Ziel setzen. Hell = im Sichtbereich, dunkel = erkundet.
+        Maustaste halten: Karte verschieben.
+      </div>
+
+      <div class="section-title">Log</div>
+      <div id="log"></div>
+    </div>
+
+    <!-- MILITÄR -->
+    <div class="panel">
+      <h2>Militär, Tech &amp; Angriffe</h2>
+
+      <div class="section-title">Armee</div>
+      <div class="row"><span class="label">Infanterie</span><span class="value" id="mil-inf">0</span></div>
+      <div class="row"><span class="label">Speerträger</span><span class="value" id="mil-spear">0</span></div>
+      <div class="row"><span class="label">Bogenschützen</span><span class="value" id="mil-archer">0</span></div>
+      <div class="row"><span class="label">Kavallerie</span><span class="value" id="mil-cav">0</span></div>
+
+      <div class="section-title">Militär-Gebäude</div>
+      <button data-action="build-barracks">Kaserne (175🪵)</button>
+      <button data-action="build-range">Schießanlage (200🪵, 50🪙)</button>
+      <button data-action="build-stable">Stall (175🪵, 75🪙)</button>
+
+      <div class="section-title">Einheiten produzieren</div>
+      <button data-action="train-inf">Infanterie (60🍞, 20🪙)</button>
+      <button data-action="train-spear">Speerträger (50🍞, 35🪵)</button>
+      <button data-action="train-archer">Bogenschütze (50🪵, 45🪙)</button>
+      <button data-action="train-cav">Kundschafter (80🍞, 40🪙)</button>
+
+      <div class="section-title">Angriffe</div>
+      <button data-action="raid">Kleiner Überfall</button>
+      <button data-action="push">Grosser Angriff</button>
+
+      <div class="section-title">Spielgeschwindigkeit</div>
+      <button data-action="speed1">x1</button>
+      <button data-action="speed2">x2</button>
+      <button data-action="speed4">x4</button>
+    </div>
+  </div>
+
+  <script>
+    // ----------- Logging -----------
+    const logEl = document.getElementById("log");
+    function log(msg, type="system"){
+      const div=document.createElement("div");
+      div.textContent=msg;
+      div.className = type==="good" ? "log-good" :
+                      type==="bad" ? "log-bad" :
+                      type==="danger" ? "log-danger" : "log-system";
+      logEl.appendChild(div);
+      logEl.scrollTop=logEl.scrollHeight;
+    }
+
+    // ----------- Makrospiel-Daten -----------
+    const macro={
+      t:0,
+      speed:1,
+      age:1,
+      res:{food:200,wood:200,gold:100,stone:0},
+      villagers:["food","food","food"],
+      ecoUp:{wood:false,food:false,wheel:false},
+      buildings:{houses:0,barracks:0,range:0,stable:0},
+      army:{inf:0,spear:0,archer:0,cav:0},
+      baseHP:100, baseHPMax:100,
+      enemyHP:200, enemyHPMax:200,
+      enemyStr:10,
+      enemyTimer:40,
+      enemyTimerBase:40
+    };
+    const ages=["","Dunkles Zeitalter","Feudalzeit","Ritterzeit","Imperium"];
+
+    function popCap(){return 5+macro.buildings.houses*5;}
+    function totalPop(){return macro.villagers.length+macro.army.inf+macro.army.spear+macro.army.archer+macro.army.cav;}
+
+    function tinyRate(task){
+      const base= task==="food" ? 4 : task==="wood" ? 4 : task==="gold" ? 3 : task==="stone" ? 2 : 0;
+      let m=1;
+      if(macro.age>=2)m*=1.05;
+      if(macro.age>=3)m*=1.1;
+      if(task==="wood"&&macro.ecoUp.wood)m*=1.2;
+      if(task==="food"&&macro.ecoUp.food)m*=1.2;
+      if(macro.ecoUp.wheel)m*=1.15;
+      return base*m;
+    }
+
+    function canPay(c){
+      return macro.res.food>=(c.food||0)&&macro.res.wood>=(c.wood||0)&&
+             macro.res.gold>=(c.gold||0)&&macro.res.stone>=(c.stone||0);
+    }
+    function pay(c){
+      macro.res.food-=c.food||0;
+      macro.res.wood-=c.wood||0;
+      macro.res.gold-=c.gold||0;
+      macro.res.stone-=c.stone||0;
+    }
+
+    function updateEcoUI(){
+      document.getElementById("ui-time").textContent=macro.t;
+      document.getElementById("ui-age").textContent=ages[macro.age];
+      document.getElementById("ui-food").textContent=Math.floor(macro.res.food);
+      document.getElementById("ui-wood").textContent=Math.floor(macro.res.wood);
+      document.getElementById("ui-gold").textContent=Math.floor(macro.res.gold);
+      document.getElementById("ui-stone").textContent=Math.floor(macro.res.stone);
+      document.getElementById("ui-pop").textContent=totalPop()+" / "+popCap();
+
+      const counts={food:0,wood:0,gold:0,stone:0,idle:0};
+      macro.villagers.forEach(t=>{counts[t]=(counts[t]||0)+1;});
+      document.getElementById("vils-count").textContent=macro.villagers.length;
+      document.getElementById("vils-food").textContent=counts.food||0;
+      document.getElementById("vils-wood").textContent=counts.wood||0;
+      document.getElementById("vils-gold").textContent=counts.gold||0;
+      document.getElementById("vils-stone").textContent=counts.stone||0;
+      document.getElementById("vils-idle").textContent=counts.idle||0;
+
+      const rFood=(counts.food||0)*tinyRate("food");
+      const rWood=(counts.wood||0)*tinyRate("wood");
+      const rGold=(counts.gold||0)*tinyRate("gold");
+      const rStone=(counts.stone||0)*tinyRate("stone");
+      document.getElementById("rate-food").textContent=rFood.toFixed(1);
+      document.getElementById("rate-wood").textContent=rWood.toFixed(1);
+      document.getElementById("rate-gold").textContent=rGold.toFixed(1);
+      document.getElementById("rate-stone").textContent=rStone.toFixed(1);
+
+      document.getElementById("ui-houses").textContent=macro.buildings.houses;
+      document.getElementById("ui-barracks").textContent=macro.buildings.barracks;
+      document.getElementById("ui-range").textContent=macro.buildings.range;
+      document.getElementById("ui-stable").textContent=macro.buildings.stable;
+
+      document.getElementById("mil-inf").textContent=macro.army.inf;
+      document.getElementById("mil-spear").textContent=macro.army.spear;
+      document.getElementById("mil-archer").textContent=macro.army.archer;
+      document.getElementById("mil-cav").textContent=macro.army.cav;
+
+      const baseR=Math.max(0,macro.baseHP)/macro.baseHPMax;
+      const enemyR=Math.max(0,macro.enemyHP)/macro.enemyHPMax;
+      document.getElementById("hp-base").style.width=(baseR*100)+"%";
+      document.getElementById("hp-enemy").style.width=(enemyR*100)+"%";
+      document.getElementById("hp-base-label").textContent=Math.floor(Math.max(0,macro.baseHP))+" / "+macro.baseHPMax;
+      document.getElementById("hp-enemy-label").textContent=Math.floor(Math.max(0,macro.enemyHP))+" / "+macro.enemyHPMax;
+    }
+
+    function ecoTick(){
+      macro.t++;
+      macro.villagers.forEach(task=>{
+        const g=tinyRate(task);
+        if(task==="food")macro.res.food+=g;
+        if(task==="wood")macro.res.wood+=g;
+        if(task==="gold")macro.res.gold+=g;
+        if(task==="stone")macro.res.stone+=g;
+      });
+      macro.enemyTimer--;
+      if(macro.enemyTimer<=0){
+        enemyAttack();
+        macro.enemyTimerBase=Math.max(18,macro.enemyTimerBase-1);
+        macro.enemyTimer=macro.enemyTimerBase;
+        macro.enemyStr+=4;
+      }
+    }
+
+    function enemyAttack(){
+      const defense=macro.army.inf*5+macro.army.spear*6+macro.army.archer*4+macro.army.cav*7;
+      const dmg=Math.max(0,macro.enemyStr-defense*0.5);
+      macro.baseHP-=dmg;
+      if(dmg===0 && defense>0) log("Feindlicher Angriff abgewehrt.","good");
+      else if(dmg>0) log("Feindangriff! Deine Basis erleidet "+Math.floor(dmg)+" Schaden.","danger");
+      if(macro.baseHP<=0){macro.baseHP=0;log("Deine Stadt fällt. Niederlage.","danger");}
+    }
+
+    function pushAttack(mult,label){
+      const size=macro.army.inf+macro.army.spear+macro.army.archer+macro.army.cav;
+      if(size===0){log("Du hast keine Armee für einen Angriff.","bad");return;}
+      const atk=(macro.army.inf*6+macro.army.spear*5+macro.army.archer*7+macro.army.cav*9)*mult;
+      const armor=12;
+      const dmg=Math.max(5,Math.floor(atk-armor));
+      macro.enemyHP-=dmg;
+      log("Du führst einen "+label+" und verursachst "+dmg+" Schaden.","bad");
+      if(macro.enemyHP<=0){macro.enemyHP=0;log("Die feindliche Festung stürzt ein. Sieg!","good");}
+    }
+
+    function doAction(a){
+      switch(a){
+        case "task-food": macro.villagers[0]="food"; log("Ein Villager sammelt Nahrung.","system"); break;
+        case "task-wood": macro.villagers[0]="wood"; log("Ein Villager fällt Holz.","system"); break;
+        case "task-gold": macro.villagers[0]="gold"; log("Ein Villager schürft Gold.","system"); break;
+        case "task-stone": macro.villagers[0]="stone"; log("Ein Villager bricht Stein.","system"); break;
+        case "task-idle": macro.villagers[0]="idle"; log("Ein Villager ist untätig.","system"); break;
+        case "make-vil":
+          if(!canPay({food:50})){log("Zu wenig Nahrung für einen Villager.","bad");break;}
+          if(totalPop()>=popCap()){log("Bevölkerungsgrenze erreicht. Baue ein Haus.","bad");break;}
+          pay({food:50}); macro.villagers.push("food"); log("Neuer Dorfbewohner ausgebildet.","good"); break;
+        case "build-house":
+          if(!canPay({wood:25})){log("Zu wenig Holz für ein Haus.","bad");break;}
+          pay({wood:25}); macro.buildings.houses++; log("Haus gebaut. Bevölkerungsgrenze steigt.","good"); break;
+        case "eco-wood":
+          if(macro.ecoUp.wood){log("Doppelaxt bereits erforscht.","bad");break;}
+          if(!canPay({food:100,gold:50})){log("Zu wenig Ressourcen für Doppelaxt.","bad");break;}
+          pay({food:100,gold:50}); macro.ecoUp.wood=true; log("Doppelaxt erforscht.","good"); break;
+        case "eco-food":
+          if(macro.ecoUp.food){log("Pflug bereits erforscht.","bad");break;}
+          if(!canPay({food:125,gold:75})){log("Zu wenig Ressourcen für Pflug.","bad");break;}
+          pay({food:125,gold:75}); macro.ecoUp.food=true; log("Pflug erforscht.","good"); break;
+        case "eco-wheel":
+          if(macro.ecoUp.wheel){log("Schubkarre bereits erforscht.","bad");break;}
+          if(!canPay({food:175,gold:75})){log("Zu wenig Ressourcen für Schubkarre.","bad");break;}
+          pay({food:175,gold:75}); macro.ecoUp.wheel=true; log("Schubkarre erforscht.","good"); break;
+        case "build-barracks":
+          if(!canPay({wood:175})){log("Zu wenig Holz für eine Kaserne.","bad");break;}
+          pay({wood:175}); macro.buildings.barracks++; log("Kaserne errichtet.","good"); break;
+        case "build-range":
+          if(!canPay({wood:200,gold:50})){log("Zu wenig Ressourcen für eine Schießanlage.","bad");break;}
+          pay({wood:200,gold:50}); macro.buildings.range++; log("Schießanlage errichtet.","good"); break;
+        case "build-stable":
+          if(!canPay({wood:175,gold:75})){log("Zu wenig Ressourcen für einen Stall.","bad");break;}
+          pay({wood:175,gold:75}); macro.buildings.stable++; log("Stall errichtet.","good"); break;
+        case "train-inf":
+          if(macro.buildings.barracks<=0){log("Du brauchst zuerst eine Kaserne.","bad");break;}
+          if(!canPay({food:60,gold:20})){log("Zu wenig Ressourcen für Infanterie.","bad");break;}
+          if(totalPop()>=popCap()){log("Bevölkerungsgrenze erreicht.","bad");break;}
+          pay({food:60,gold:20}); macro.army.inf++; log("Infanterist ausgebildet.","good"); break;
+        case "train-spear":
+          if(macro.buildings.barracks<=0){log("Du brauchst zuerst eine Kaserne.","bad");break;}
+          if(!canPay({food:50,wood:35})){log("Zu wenig Ressourcen für einen Speerträger.","bad");break;}
+          if(totalPop()>=popCap()){log("Bevölkerungsgrenze erreicht.","bad");break;}
+          pay({food:50,wood:35}); macro.army.spear++; log("Speerträger ausgebildet.","good"); break;
+        case "train-archer":
+          if(macro.buildings.range<=0){log("Du brauchst zuerst eine Schießanlage.","bad");break;}
+          if(!canPay({wood:50,gold:45})){log("Zu wenig Ressourcen für einen Bogenschützen.","bad");break;}
+          if(totalPop()>=popCap()){log("Bevölkerungsgrenze erreicht.","bad");break;}
+          pay({wood:50,gold:45}); macro.army.archer++; log("Bogenschütze ausgebildet.","good"); break;
+        case "train-cav":
+          if(macro.buildings.stable<=0){log("Du brauchst zuerst einen Stall.","bad");break;}
+          if(!canPay({food:80,gold:40})){log("Zu wenig Ressourcen für Kavallerie.","bad");break;}
+          if(totalPop()>=popCap()){log("Bevölkerungsgrenze erreicht.","bad");break;}
+          pay({food:80,gold:40}); macro.army.cav++; log("Kundschafter ausgebildet.","good"); break;
+        case "raid": pushAttack(0.7,"kleinen Überfall"); break;
+        case "push": pushAttack(1.2,"grossen Angriff"); break;
+        case "speed1": macro.speed=1; log("Geschwindigkeit x1.","system"); break;
+        case "speed2": macro.speed=2; log("Geschwindigkeit x2.","system"); break;
+        case "speed4": macro.speed=4; log("Geschwindigkeit x4.","system"); break;
+      }
+      updateEcoUI();
+    }
+
+    document.querySelectorAll("button[data-action]").forEach(btn=>{
+      btn.addEventListener("click",()=>doAction(btn.getAttribute("data-action")));
+    });
+
+    setInterval(()=>{
+      for(let i=0;i<macro.speed;i++) ecoTick();
+      updateEcoUI();
+    },1000);
+
+    // ----------- Minimap & Einheiten -----------
+    const W=128,H=128;
+    const minimap=document.getElementById("minimap");
+    const tiles=new Array(W*H);
+    const discovered=new Array(W*H).fill(true); // alles schon grob erkundet
+    const visible=new Array(W*H).fill(false);
+    const unitHere=new Array(W*H).fill(false);
+    const tileEls=new Array(W*H);
+    let playerBase={x:20,y:90};
+    let enemyBase={x:105,y:25};
+    const units=[
+      {id:1,x:24,y:86,vision:10,tx:null,ty:null},
+      {id:2,x:18,y:96,vision:8,tx:null,ty:null},
+      {id:3,x:30,y:92,vision:12,tx:null,ty:null}
+    ];
+    let selectedUnitId=1;
+
+    function idx(x,y){return y*W+x;}
+    function clamp(v,min,max){return v<min?min:v>max?max:v;}
+
+    // DOM-Tiles erzeugen
+    for(let y=0;y<H;y++){
+      for(let x=0;x<W;x++){
+        tiles[idx(x,y)]="g";
+        const d=document.createElement("div");
+        d.className="tile g fog-d";
+        d.addEventListener("click",e=>{
+          e.stopPropagation();
+          handleTileClick(x,y);
+        });
+        minimap.appendChild(d);
+        tileEls[idx(x,y)]=d;
+      }
+    }
+
+    function setAll(type){
+      for(let i=0;i<W*H;i++) tiles[i]=type;
+    }
+    function circle(cx,cy,r,type){
+      const r2=r*r;
+      for(let y=-r;y<=r;y++){
+        for(let x=-r;x<=r;x++){
+          const nx=cx+x,ny=cy+y;
+          if(nx<0||ny<0||nx>=W||ny>=H) continue;
+          if(x*x+y*y<=r2) tiles[idx(nx,ny)]=type;
+        }
+      }
+    }
+    function rect(x1,y1,x2,y2,type){
+      const sx=Math.max(0,Math.min(x1,x2));
+      const ex=Math.min(W-1,Math.max(x1,x2));
+      const sy=Math.max(0,Math.min(y1,y2));
+      const ey=Math.min(H-1,Math.max(y1,y2));
+      for(let y=sy;y<=ey;y++){
+        for(let x=sx;x<=ex;x++){
+          tiles[idx(x,y)]=type;
+        }
+      }
+    }
+    function scatter(cx,cy,r,type,count){
+      let placed=0,tries=0;
+      while(placed<count && tries<count*20){
+        tries++;
+        const a=Math.random()*Math.PI*2;
+        const rr=Math.random()*r;
+        const nx=Math.round(cx+Math.cos(a)*rr);
+        const ny=Math.round(cy+Math.sin(a)*rr);
+        if(nx<0||ny<0||nx>=W||ny>=H) continue;
+        const i=idx(nx,ny);
+        if(tiles[i]==="g"){
+          tiles[i]=type;
+          placed++;
+        }
+      }
+    }
+
+    function genArabia(){
+      setAll("g");
+      for(let i=0;i<10;i++){
+        circle(
+          Math.floor(W*(0.1+0.8*Math.random())),
+          Math.floor(H*(0.1+0.8*Math.random())),
+          6+Math.floor(Math.random()*10),
+          "f"
+        );
+      }
+      for(let i=0;i<3;i++){
+        circle(
+          Math.floor(W*(0.2+0.6*Math.random())),
+          Math.floor(H*(0.2+0.6*Math.random())),
+          5+Math.floor(Math.random()*8),
+          "w"
+        );
+      }
+      playerBase={x:Math.floor(W*0.25),y:Math.floor(H*0.7)};
+      enemyBase={x:Math.floor(W*0.75),y:Math.floor(H*0.3)};
+      scatter(playerBase.x,playerBase.y,14,"o",6);
+      scatter(enemyBase.x,enemyBase.y,14,"o",6);
+      scatter(playerBase.x,playerBase.y,18,"s",4);
+      scatter(enemyBase.x,enemyBase.y,18,"s",4);
+    }
+
+    function genBlackForest(){
+      setAll("f");
+      const midY=Math.floor(H*0.35);
+      rect(0,midY-2,W-1,midY+2,"g");
+      const midY2=Math.floor(H*0.7);
+      rect(0,midY2-2,W-1,midY2+2,"g");
+      const midX=Math.floor(W*0.5);
+      rect(midX-2,0,midX+2,H-1,"g");
+      playerBase={x:Math.floor(W*0.2),y:Math.floor(H*0.2)};
+      enemyBase={x:Math.floor(W*0.8),y:Math.floor(H*0.8)};
+      circle(playerBase.x,playerBase.y,6,"g");
+      circle(enemyBase.x,enemyBase.y,6,"g");
+      scatter(playerBase.x,playerBase.y,14,"o",4);
+      scatter(enemyBase.x,enemyBase.y,14,"o",4);
+    }
+
+    function genArena(){
+      setAll("f");
+      const cx=Math.floor(W/2),cy=Math.floor(H/2);
+      circle(cx,cy,40,"g");
+      circle(cx,cy,32,"s");
+      playerBase={x:cx-20,y:cy+15};
+      enemyBase={x:cx+20,y:cy-15};
+      circle(playerBase.x,playerBase.y,6,"g");
+      circle(enemyBase.x,enemyBase.y,6,"g");
+      scatter(playerBase.x,playerBase.y,16,"o",6);
+      scatter(enemyBase.x,enemyBase.y,16,"o",6);
+    }
+
+    function genIslands(){
+      setAll("w");
+      const m1={x:Math.floor(W*0.28),y:Math.floor(H*0.65)};
+      const m2={x:Math.floor(W*0.72),y:Math.floor(H*0.35)};
+      circle(m1.x,m1.y,32,"g");
+      circle(m2.x,m2.y,32,"g");
+      for(let i=0;i<6;i++){
+        circle(
+          Math.floor(W*(0.1+0.8*Math.random())),
+          Math.floor(H*(0.1+0.8*Math.random())),
+          4+Math.floor(Math.random()*6),
+          "g"
+        );
+      }
+      for(let i=0;i<15;i++){
+        const x=Math.floor(W*Math.random());
+        const y=Math.floor(H*Math.random());
+        if(tiles[idx(x,y)]==="g") circle(x,y,3,"f");
+      }
+      playerBase={x:m1.x-6,y:m1.y};
+      enemyBase={x:m2.x+6,y:m2.y};
+      scatter(playerBase.x,playerBase.y,18,"o",5);
+      scatter(enemyBase.x,enemyBase.y,18,"o",5);
+    }
+
+    function applyTerrain(){
+      for(let i=0;i<W*H;i++){
+        tileEls[i].className="tile "+tiles[i]+" fog-d";
+      }
+    }
+
+    function markUnits(){
+      unitHere.fill(false);
+      units.forEach(u=>{
+        if(u.x>=0&&u.x<W&&u.y>=0&&u.y<H){
+          unitHere[idx(u.x,u.y)]=true;
+        }
+      });
+    }
+
+    function recomputeFog(){
+      visible.fill(false);
+      units.forEach(u=>{
+        const r=u.vision;
+        for(let dy=-r;dy<=r;dy++){
+          for(let dx=-r;dx<=r;dx++){
+            const nx=u.x+dx,ny=u.y+dy;
+            if(nx<0||ny<0||nx>=W||ny>=H) continue;
+            if(dx*dx+dy*dy>r*r) continue;
+            visible[idx(nx,ny)]=true;
+          }
+        }
+      });
+      updateMinimapClasses();
+    }
+
+    function updateMinimapClasses(){
+      for(let i=0;i<W*H;i++){
+        const base="tile "+tiles[i];
+        const fogClass = visible[i] ? "fog-v" : "fog-d";
+        const unitClass = unitHere[i] ? " u-tile" : "";
+        tileEls[i].className=base+" "+fogClass+unitClass;
+      }
+      const pb=idx(playerBase.x,playerBase.y);
+      const eb=idx(enemyBase.x,enemyBase.y);
+      tileEls[pb].className="tile pb fog-v";
+      tileEls[eb].className="tile eb fog-v";
+      units.forEach(u=>{
+        if(u.x<0||u.x>=W||u.y<0||u.y>=H) return;
+        const i=idx(u.x,u.y);
+        if(u.id===selectedUnitId) tileEls[i].classList.add("u-sel");
+      });
+    }
+
+    function placeUnits(){
+      const offs=[{dx:-4,dy:-4},{dx:4,dy:-4},{dx:0,dy:4}];
+      units.forEach((u,i)=>{
+        const o=offs[i]||{dx:0,dy:0};
+        u.x=clamp(playerBase.x+o.dx,1,W-2);
+        u.y=clamp(playerBase.y+o.dy,1,H-2);
+        u.tx=null;u.ty=null;
+      });
+      markUnits();
+      recomputeFog();
+    }
+
+    function selectUnitAt(x,y){
+      const u=units.find(u=>u.x===x && u.y===y);
+      if(u){
+        selectedUnitId=u.id;
+        log("Einheit #"+u.id+" ausgewählt.","system");
+        recomputeFog();
+        return true;
+      }
+      return false;
+    }
+
+    function nearestUnit(x,y){
+      let best=null,bestD=Infinity;
+      units.forEach(u=>{
+        const dx=u.x-x,dy=u.y-y;
+        const d=dx*dx+dy*dy;
+        if(d<bestD){bestD=d;best=u;}
+      });
+      return best;
+    }
+
+    function handleTileClick(x,y){
+      if(selectUnitAt(x,y))return;
+      const u=units.find(u=>u.id===selectedUnitId)||nearestUnit(x,y);
+      if(!u)return;
+      u.tx=x;u.ty=y;
+      log("Einheit #"+u.id+" bewegt sich nach ("+x+","+y+").","system");
+    }
+
+    function stepUnits(){
+      let moved=false;
+      units.forEach(u=>{
+        if(u.tx==null||u.ty==null)return;
+        if(u.x===u.tx && u.y===u.ty){u.tx=null;u.ty=null;return;}
+        let dx=0,dy=0;
+        if(u.x<u.tx)dx=1; else if(u.x>u.tx)dx=-1;
+        if(u.y<u.ty)dy=1; else if(u.y>u.ty)dy=-1;
+        const nx=u.x+dx,ny=u.y+dy;
+        if(nx<0||ny<0||nx>=W||ny>=H){u.tx=null;u.ty=null;return;}
+        u.x=nx;u.y=ny;moved=true;
+      });
+      if(moved){
+        markUnits();
+        recomputeFog();
+      }
+    }
+    setInterval(stepUnits,140);
+
+    // Pan
+    const wrapper=document.getElementById("minimap-wrapper");
+    let dragging=false,startX=0,startY=0,offX=0,offY=0;
+    function applyTransform(){
+      minimap.style.transform="translate("+offX+"px,"+offY+"px)";
+    }
+    applyTransform();
+    wrapper.addEventListener("mousedown",e=>{
+      dragging=true;startX=e.clientX;startY=e.clientY;
+    });
+    wrapper.addEventListener("mouseup",()=>dragging=false);
+    wrapper.addEventListener("mouseleave",()=>dragging=false);
+    wrapper.addEventListener("mousemove",e=>{
+      if(!dragging)return;
+      const dx=e.clientX-startX,dy=e.clientY-startY;
+      startX=e.clientX;startY=e.clientY;
+      offX+=dx;offY+=dy;
+      applyTransform();
+    });
+
+    // Kartenwechsel
+    const mapSel=document.getElementById("map-type");
+    document.getElementById("btn-new-map").addEventListener("click",()=>{
+      const t=mapSel.value;
+      if(t==="black_forest")genBlackForest();
+      else if(t==="arena")genArena();
+      else if(t==="islands")genIslands();
+      else genArabia();
+      tiles[idx(playerBase.x,playerBase.y)]="pb";
+      tiles[idx(enemyBase.x,enemyBase.y)]="eb";
+      applyTerrain();
+      placeUnits();
+      log("Neue Karte: "+t+".","system");
+    });
+
+    // Start
+    genArabia();
+    tiles[idx(playerBase.x,playerBase.y)]="pb";
+    tiles[idx(enemyBase.x,enemyBase.y)]="eb";
+    applyTerrain();
+    placeUnits();
+    updateEcoUI();
+    log("Willkommen im Mini-Age-of-Empires. Baue Eco, erkunde mit deinen Einheiten und zerstöre die feindliche Basis.","system");
+  </script>
+</body>
+</html>
